@@ -1,0 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-ink: #000000;
+  --color-accent: #2563EB;
+  --color-paper: #FFFFFF;
+}
+
+@layer base {
+  body {
+    @apply antialiased text-ink bg-paper font-sans selection:bg-accent selection:text-white;
+  }
+
+  h1, h2, h3, h4 {
+    @apply uppercase font-black tracking-tighter leading-[0.85];
+  }
+}
+
+@layer components {
+  .brutal-border {
+    @apply border-4 border-ink;
+  }
+  
+  .section-label {
+    @apply text-[12px] font-black uppercase mb-5 block tracking-wider;
+  }
+
+  .chip-brutal {
+    @apply px-4 py-2 border border-ink rounded-full text-[12px] font-bold uppercase transition-all;
+  }
+
+  .chip-brutal.active {
+    @apply bg-ink text-white;
+  }
+}
