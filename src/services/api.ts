@@ -80,7 +80,8 @@ export const searchBiddings = async ({
   params.append('pagina', String(pagina));
   params.append('tamanhoPagina', String(tamanhoPagina));
 
-  const url = `/api/licitacoes${params.toString() ? `?${params.toString()}` : ''}`;
+  const baseUrl = import.meta.env.VITE_API_URL || '';
+  const url = `${baseUrl}/api/licitacoes${params.toString() ? `?${params.toString()}` : ''}`;
 
   try {
     const response = await fetch(url);
@@ -96,8 +97,9 @@ export const searchBiddings = async ({
 };
 
 export const getBiddingById = async (id: string): Promise<Bidding | null> => {
+  const baseUrl = import.meta.env.VITE_API_URL || '';
   try {
-    const response = await fetch(`/api/licitacoes/${id}`);
+    const response = await fetch(`${baseUrl}/api/licitacoes/${id}`);
     if (!response.ok) {
       if (response.status === 404) {
         return null;
@@ -113,8 +115,9 @@ export const getBiddingById = async (id: string): Promise<Bidding | null> => {
 };
 
 export const getModalidades = async (): Promise<string[]> => {
+  const baseUrl = import.meta.env.VITE_API_URL || '';
   try {
-    const response = await fetch('/api/licitacoes/modalidades');
+    const response = await fetch(`${baseUrl}/api/licitacoes/modalidades`);
     if (!response.ok) {
       throw new Error(`HTTP error: ${response.status}`);
     }

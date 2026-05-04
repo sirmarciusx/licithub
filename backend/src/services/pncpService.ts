@@ -1,4 +1,39 @@
 import { Bidding, BiddingService, SearchFilters, PncpContratacao, PncpPaginatedResponse, PaginatedResponse } from '../types/bidding';
+import { MOCK_BIDDINGS } from '../data/biddingData';
+
+function filterMockBiddings(items: Bidding[], filters?: SearchFilters): Bidding[] {
+  return items.filter((item) => {
+    if (filters?.query) {
+      const searchTerm = normalize(filters.query);
+      const searchableText = normalize(`${item.title} ${item.description} ${item.category}`);
+      if (!searchableText.includes(searchTerm)) return false;
+    }
+
+    if (filters?.uf && filters.uf !== 'Todas') {
+      if (!item.location?.includes(filters.uf)) return false;
+    }
+
+    if (filters?.modalidade) {
+      const modalityNames = ['Leilão Eletrônico', 'Diálogo Competitivo', 'Concurso', 'Concorrência Eletrônica', 'Concorrência Presencial', 'Pregão Eletrônico', 'Pregão Presencial', 'Dispensa de Licitação', 'Inexigibilidade'];
+      const modality = modalityNames[filters.modalidade - 1];
+      if (modality && item.modalidade !== modality) return false;
+    }
+
+    if (filters?.category && filters.category !== 'Todas as Categorias') {
+      if (!normalize(item.category || '').includes(normalize(filters.category))) return false;
+    }
+
+    if (filters?.status && filters.status !== 'Todos') {
+      if (item.status !== filters.status) return false;
+    }
+
+    const value = item.value || item.valorEstimado || item.valorHomologado || 0;
+    if (typeof filters?.valorMin === 'number' && value < filters.valorMin) return false;
+    if (typeof filters?.valorMax === 'number' && value > filters.valorMax) return false;
+
+    return true;
+  });
+}
 
 const MODALITY_CODES: Record<string, number> = {
   'Leilão Eletrônico': 1,
@@ -56,7 +91,7 @@ function normalize(value: string | undefined): string {
 }
 
 function hasLocalFilters(filters?: SearchFilters): boolean {
-  return Boolean(filters?.category || filters?.status || filters?.valorMin || filters?.valorMax);
+  return Boolean(filters?.query || filters?.category || filters?.status || filters?.valorMin || filters?.valorMax);
 }
 
 function applyLocalFilters(items: Bidding[], filters?: SearchFilters): Bidding[] {
@@ -64,6 +99,12 @@ function applyLocalFilters(items: Bidding[], filters?: SearchFilters): Bidding[]
 
   return items.filter((item) => {
     const value = item.valorEstimado || item.valorHomologado || item.value || 0;
+
+    if (filters.query) {
+      const searchTerm = normalize(filters.query);
+      const searchableText = normalize(`${item.title} ${item.description} ${item.category} ${item.modalidade}`);
+      if (!searchableText.includes(searchTerm)) return false;
+    }
 
     if (filters.category && filters.category !== 'Todas as Categorias') {
       const haystack = normalize(`${item.category} ${item.modalidade} ${item.description}`);
@@ -191,27 +232,39 @@ export class PncpBiddingService implements BiddingService {
       ? `/v1/contratacoes/publicacao?${params.toString()}`
       : `/v1/contratacoes/proposta?${params.toString()}`;
 
-    const response = await this.fetchFromPncp<PncpPaginatedResponse<PncpContratacao>>(endpoint);
+    try {
+      const response = await this.fetchFromPncp<PncpPaginatedResponse<PncpContratacao>>(endpoint);
 
-    if (!response.data || response.data.length === 0) {
+      if (!response.data || response.data.length === 0) {
+        const mockFiltered = filterMockBiddings(MOCK_BIDDINGS, filters);
+        return {
+          items: mockFiltered,
+          totalRegistros: mockFiltered.length,
+          totalPaginas: 1,
+          pagina: 1,
+        };
+      }
+
+      const mappedItems = response.data.map(mapPncpToBidding);
+      const filteredItems = applyLocalFilters(mappedItems, filters);
+      const localFiltersApplied = hasLocalFilters(filters);
+
       return {
-        items: [],
-        totalRegistros: 0,
-        totalPaginas: 0,
-        pagina: filters?.pagina || 1,
+        items: filteredItems,
+        totalRegistros: localFiltersApplied ? filteredItems.length : response.totalRegistros,
+        totalPaginas: localFiltersApplied ? Math.max(1, Math.ceil(filteredItems.length / (filters?.tamanhoPagina || 50))) : response.totalPaginas,
+        pagina: response.numeroPagina,
+      };
+    } catch (error) {
+      console.warn('[PNCP API] Falha, usando dados mock:', error instanceof Error ? error.message : 'Unknown error');
+      const mockFiltered = filterMockBiddings(MOCK_BIDDINGS, filters);
+      return {
+        items: mockFiltered,
+        totalRegistros: mockFiltered.length,
+        totalPaginas: 1,
+        pagina: 1,
       };
     }
-
-    const mappedItems = response.data.map(mapPncpToBidding);
-    const filteredItems = applyLocalFilters(mappedItems, filters);
-    const localFiltersApplied = hasLocalFilters(filters);
-
-    return {
-      items: filteredItems,
-      totalRegistros: localFiltersApplied ? filteredItems.length : response.totalRegistros,
-      totalPaginas: localFiltersApplied ? Math.max(1, Math.ceil(filteredItems.length / (filters?.tamanhoPagina || 50))) : response.totalPaginas,
-      pagina: response.numeroPagina,
-    };
   }
 
   async findById(id: string): Promise<Bidding | null> {

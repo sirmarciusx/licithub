@@ -195,51 +195,17 @@ export default function App() {
               </div>
             </div>
 
-            <nav className="hidden lg:flex items-center gap-1">
-              <NavItem icon={Zap} label="Dashboard" />
-              <NavItem icon={Bell} label="Notificações" badge={3} />
-              <NavItem icon={Settings} label="Configurações" />
-            </nav>
-
-            <div className="flex items-center gap-3">
-              <button className="relative p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all" aria-label="Notificações">
-                <Bell size={20} />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-              </button>
-
-              <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all" aria-label="Usuário">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400/30 to-blue-600/30 border border-white/10 flex items-center justify-center">
-                  <User size={16} className="text-white" />
-                </div>
-              </button>
-
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all"
-                aria-label="Abrir menu"
-              >
-                {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-              </button>
-            </div>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all"
+              aria-label="Abrir menu"
+            >
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
           </div>
         </div>
 
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="lg:hidden border-t border-white/5 bg-[#0f1629]/95 backdrop-blur-xl"
-            >
-              <div className="px-4 py-4 space-y-2">
-                <MobileNavItem icon={Zap} label="Dashboard" />
-                <MobileNavItem icon={Bell} label="Notificações" badge={3} />
-                <MobileNavItem icon={Settings} label="Configurações" />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        
       </header>
 
       <section className="bg-[#0f1629]/50 border-b border-white/5">
