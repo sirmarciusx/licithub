@@ -2,6 +2,7 @@ services:
   - type: web
     name: licithub-backend
     env: node
+    rootDir: backend
     buildCommand: npm install && npm run build
     startCommand: node dist/server.js
     envVars:
