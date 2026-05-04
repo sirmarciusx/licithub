@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: licithub-backend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
+    envVars:
+      - key: PORT
+        value: "3001"
+      - key: PNCP_API_BASE_URL
+        value: "https://pncp.gov.br/api/consulta"
+      - key: DEFAULT_DAYS_RANGE
+        value: "30"
+      - key: ALLOWED_ORIGINS
+        value: "http://localhost:5173,http://localhost:3000"
