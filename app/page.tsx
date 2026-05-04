@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Search,
   ShieldCheck,
@@ -99,7 +99,7 @@ export default function Home() {
   const [dataFinal, setDataFinal] = useState('');
   const [processNumber, setProcessNumber] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const isInitialFiltersRender = useRef(true);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   useEffect(() => {
     getModalidades().then(setModalidades).catch(console.error);
@@ -107,11 +107,11 @@ export default function Home() {
 
   const getModalidadeCode = (nome: string): number => MODALITY_CODES[nome] || 0;
 
-  const buildSearchQuery = (query = searchQuery, process = processNumber) => {
+  const buildSearchQuery = useCallback((query = searchQuery, process = processNumber) => {
     return [query.trim(), process.trim()].filter(Boolean).join(' ');
-  };
+  }, [searchQuery, processNumber]);
 
-  const executeSearch = async (page = currentPage, overrides: Partial<{
+  const executeSearch = useCallback(async (page = 1, overrides: Partial<{
     query: string;
     process: string;
     uf: string;
@@ -123,21 +123,31 @@ export default function Home() {
     start: string;
     end: string;
   }> = {}) => {
-    const selectedModalidade = overrides.modalidade ?? activeModalidade;
+    const selectedModalidade = overrides?.modalidade ?? activeModalidade;
+    const query = overrides?.query ?? searchQuery;
+    const process = overrides?.process ?? processNumber;
+    const uf = overrides?.uf ?? activeUf;
+    const category = overrides?.category ?? filterCategoria;
+    const status = overrides?.status ?? activeStatus;
+    const min = overrides?.min ?? valorMin;
+    const max = overrides?.max ?? valorMax;
+    const start = overrides?.start ?? dataInicial;
+    const end = overrides?.end ?? dataFinal;
+
     try {
       setLoading(true);
       setBiddings([]);
       setTotalRegistros(0);
       const response = await searchBiddings({
-        query: buildSearchQuery(overrides.query ?? searchQuery, overrides.process ?? processNumber),
-        uf: overrides.uf ?? activeUf,
+        query: buildSearchQuery(query, process),
+        uf,
         modalidade: selectedModalidade ? getModalidadeCode(selectedModalidade) : 0,
-        category: overrides.category ?? filterCategoria,
-        status: overrides.status ?? activeStatus,
-        valorMin: overrides.min ?? valorMin,
-        valorMax: overrides.max ?? valorMax,
-        dataInicial: overrides.start ?? dataInicial,
-        dataFinal: overrides.end ?? dataFinal,
+        category,
+        status,
+        valorMin: min,
+        valorMax: max,
+        dataInicial: start,
+        dataFinal: end,
         pagina: page,
       });
       setBiddings(response.items || []);
@@ -151,20 +161,21 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery, processNumber, activeModalidade, activeUf, activeStatus, filterCategoria, valorMin, valorMax, dataInicial, dataFinal, buildSearchQuery]);
 
   useEffect(() => {
-    executeSearch(1);
-  }, []);
-
-  useEffect(() => {
-    if (isInitialFiltersRender.current) {
-      isInitialFiltersRender.current = false;
-      return;
+    if (!initialLoadDone) {
+      executeSearch(1);
+      setInitialLoadDone(true);
     }
-    setCurrentPage(1);
-    executeSearch(1);
-  }, [activeModalidade, activeUf, activeStatus]);
+  }, [initialLoadDone, executeSearch]);
+
+  useEffect(() => {
+    if (initialLoadDone) {
+      setCurrentPage(1);
+      executeSearch(1);
+    }
+  }, [initialLoadDone, activeModalidade, activeUf, activeStatus, executeSearch]);
 
   const applyFilters = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
