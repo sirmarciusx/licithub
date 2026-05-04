@@ -1,6 +1,4 @@
 {
-  "name": "LicitHub: Agregador de Licitações",
-  "description": "Uma plataforma inteligente para busca, monitoramento e análise de licitações públicas em diversos portais governamentais brasileiros.",
-  "requestFramePermissions": [],
-  "majorCapabilities": []
+  "name": "LicitHub - Agregador de Licitações",
+  "description": "Plataforma inteligente para busca, monitoramento e análise de licitações públicas em diversos portais governamentais brasileiros."
 }

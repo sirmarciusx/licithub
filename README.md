@@ -1,20 +1,31 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# LicitHub
 
-# Run and deploy your AI Studio app
+Agregador de licitações com frontend em React/Vite e backend em Node.js/Express integrado ao PNCP.
 
-This contains everything you need to run your app locally.
+## Como rodar
 
-View your app in AI Studio: https://ai.studio/apps/173789e2-7dcf-481f-b61c-3312174f541c
+### Backend
 
-## Run Locally
+```bash
+cd backend
+npm install
+npm run dev
+```
 
-**Prerequisites:**  Node.js
+O backend roda por padrão em `http://localhost:3001`.
 
+### Frontend
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+npm install
+npm run dev
+```
+
+O frontend roda em `http://localhost:3000` e encaminha `/api` para o backend.
+
+## Scripts úteis
+
+- `npm.cmd run lint`: checagem de tipos do frontend.
+- `npm.cmd run build`: build de produção do frontend.
+- `cd backend && npm.cmd run lint`: checagem de tipos do backend.
+- `cd backend && npm.cmd run build`: compilação do backend.

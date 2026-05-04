@@ -13,13 +13,33 @@ export interface Bidding {
   location: string;
   openingDate: string;
   category: string;
-  status: 'Aberto' | 'Encerrado' | 'Suspenso' | 'Em Andamento';
+  status: 'Aberto' | 'Encerrado' | 'Suspenso' | 'Em Andamento' | 'Divulgada' | 'Publicada';
+  // Campos PNCP
+  cnpjOrgao?: string;
+  nomeOrgao?: string;
+  modalidade?: string;
+  uf?: string;
+  municipio?: string;
+  valorEstimado?: number;
+  valorHomologado?: number;
+  dataPublicacao?: string;
+  dataAberturaProposta?: string;
+  dataEncerramentoProposta?: string;
+  linkOrigem?: string;
+  situacao?: string;
+  codigoModalidade?: number;
 }
 
 export interface SearchFilters {
-  query: string;
-  region: string;
-  minVal: number;
-  maxVal: number;
-  category: string;
+  query?: string;
+  category?: string;
+  status?: string;
+  uf?: string;
+  modalidade?: number;
+  valorMin?: number;
+  valorMax?: number;
+  dataInicial?: string;
+  dataFinal?: string;
+  pagina?: number;
+  tamanhoPagina?: number;
 }
