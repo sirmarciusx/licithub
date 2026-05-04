@@ -1,36 +1,85 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
-  Bell,
   ShieldCheck,
-  Zap,
-  Settings,
   Menu,
   X,
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
-  User,
   ArrowUpRight,
   TrendingUp,
   RotateCcw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bidding } from './types/bidding';
-import { BiddingCard } from './components/BiddingCard';
-import { BiddingModal } from './components/BiddingModal';
-import { CustomSelect } from './components/CustomSelect';
-import { searchBiddings, getModalidades } from './services/api';
-import { UFS, CATEGORIAS, MODALITY_CODES, STATUS_OPTIONS } from './constants/bidding';
+import { Bidding } from '@/lib/types/bidding';
+
+interface PaginatedResponse<T> {
+  items: T[];
+  totalRegistros: number;
+  totalPaginas: number;
+  pagina: number;
+}
+
+const UFS = ['Todas', 'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
+
+const CATEGORIAS = ['Todas as Categorias', 'Obras Civis', 'Tecnologia', 'Saúde', 'Serviços Limpeza', 'Alimentos', 'Serviços', 'Materiais', 'Locação', 'Outros'];
+
+const STATUS_OPTIONS = ['Todos', 'Aberto', 'Encerrado', 'Em Andamento', 'Divulgada', 'Publicada', 'Suspenso'];
+
+const MODALITY_CODES: Record<string, number> = {
+  'Leilão Eletrônico': 1,
+  'Diálogo Competitivo': 2,
+  'Concurso': 3,
+  'Concorrência Eletrônica': 4,
+  'Concorrência Presencial': 5,
+  'Pregão Eletrônico': 6,
+  'Pregão Presencial': 7,
+  'Dispensa de Licitação': 8,
+  'Inexigibilidade': 9,
+};
 
 const DEFAULT_MAX_VALUE = 10000000;
 
-export default function App() {
+async function searchBiddings(params: {
+  query?: string;
+  uf?: string;
+  modalidade?: number;
+  category?: string;
+  status?: string;
+  valorMin?: number;
+  valorMax?: number;
+  dataInicial?: string;
+  dataFinal?: string;
+  pagina?: number;
+}): Promise<PaginatedResponse<Bidding>> {
+  const searchParams = new URLSearchParams();
+  if (params.query) searchParams.append('search', params.query);
+  if (params.uf && params.uf !== 'Todas') searchParams.append('uf', params.uf);
+  if (params.modalidade) searchParams.append('modalidade', String(params.modalidade));
+  if (params.category) searchParams.append('category', params.category);
+  if (params.status) searchParams.append('status', params.status);
+  if (params.valorMin) searchParams.append('valorMin', String(params.valorMin));
+  if (params.valorMax) searchParams.append('valorMax', String(params.valorMax));
+  if (params.dataInicial) searchParams.append('dataInicial', params.dataInicial);
+  if (params.dataFinal) searchParams.append('dataFinal', params.dataFinal);
+  searchParams.append('pagina', String(params.pagina || 1));
+  searchParams.append('tamanhoPagina', '50');
+
+  const response = await fetch(`/api/licitacoes?${searchParams.toString()}`);
+  if (!response.ok) throw new Error('Failed to fetch');
+  return response.json();
+}
+
+async function getModalidades(): Promise<string[]> {
+  const response = await fetch('/api/licitacoes/modalidades');
+  if (!response.ok) throw new Error('Failed to fetch');
+  return response.json();
+}
+
+export default function Home() {
   const [biddings, setBiddings] = useState<Bidding[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,11 +89,9 @@ export default function App() {
   const [activeUf, setActiveUf] = useState('Todas');
   const [activeStatus, setActiveStatus] = useState('Todos');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRegistros, setTotalRegistros] = useState(0);
-
   const [filterCategoria, setFilterCategoria] = useState('Todas as Categorias');
   const [valorMin, setValorMin] = useState(0);
   const [valorMax, setValorMax] = useState(DEFAULT_MAX_VALUE);
@@ -55,15 +102,7 @@ export default function App() {
   const isInitialFiltersRender = useRef(true);
 
   useEffect(() => {
-    const loadModalidades = async () => {
-      try {
-        const mods = await getModalidades();
-        setModalidades(mods);
-      } catch (error) {
-        console.error('Erro ao carregar modalidades:', error);
-      }
-    };
-    loadModalidades();
+    getModalidades().then(setModalidades).catch(console.error);
   }, []);
 
   const getModalidadeCode = (nome: string): number => MODALITY_CODES[nome] || 0;
@@ -72,28 +111,23 @@ export default function App() {
     return [query.trim(), process.trim()].filter(Boolean).join(' ');
   };
 
-  const executeSearch = async (
-    page = currentPage,
-    overrides: Partial<{
-      query: string;
-      process: string;
-      uf: string;
-      modalidade: string;
-      category: string;
-      status: string;
-      min: number;
-      max: number;
-      start: string;
-      end: string;
-    }> = {}
-  ) => {
+  const executeSearch = async (page = currentPage, overrides: Partial<{
+    query: string;
+    process: string;
+    uf: string;
+    modalidade: string;
+    category: string;
+    status: string;
+    min: number;
+    max: number;
+    start: string;
+    end: string;
+  }> = {}) => {
     const selectedModalidade = overrides.modalidade ?? activeModalidade;
-
     try {
       setLoading(true);
       setBiddings([]);
       setTotalRegistros(0);
-
       const response = await searchBiddings({
         query: buildSearchQuery(overrides.query ?? searchQuery, overrides.process ?? processNumber),
         uf: overrides.uf ?? activeUf,
@@ -106,7 +140,6 @@ export default function App() {
         dataFinal: overrides.end ?? dataFinal,
         pagina: page,
       });
-
       setBiddings(response.items || []);
       setTotalPages(Math.max(1, response.totalPaginas || 1));
       setTotalRegistros(response.totalRegistros || 0);
@@ -122,7 +155,6 @@ export default function App() {
 
   useEffect(() => {
     executeSearch(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -130,10 +162,8 @@ export default function App() {
       isInitialFiltersRender.current = false;
       return;
     }
-
     setCurrentPage(1);
     executeSearch(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeModalidade, activeUf, activeStatus]);
 
   const applyFilters = (e?: React.FormEvent) => {
@@ -175,8 +205,20 @@ export default function App() {
   };
 
   const onSearchKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      applyFilters();
+    if (e.key === 'Enter') applyFilters();
+  };
+
+  const formatCurrency = (value?: number) => {
+    if (!value) return '-';
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Aberto': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+      case 'Encerrado': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      case 'Em Andamento': return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+      default: return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
     }
   };
 
@@ -194,18 +236,14 @@ export default function App() {
                 <p className="text-[10px] text-cyan-400 font-medium tracking-widest hidden sm:block">AGREGADOR INTELIGENTE</p>
               </div>
             </div>
-
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all"
-              aria-label="Abrir menu"
             >
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
-
-        
       </header>
 
       <section className="bg-[#0f1629]/50 border-b border-white/5">
@@ -222,38 +260,35 @@ export default function App() {
                 className="w-full pl-12 pr-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 focus:border-cyan-400/50 transition-all"
               />
             </div>
-
             <div className="flex items-center gap-3 w-full lg:w-auto overflow-x-auto lg:overflow-visible no-scrollbar">
-              <CustomSelect
+              <select
                 value={activeUf}
-                onChange={setActiveUf}
-                options={[
-                  { value: 'Todas', label: 'Todos os Estados' },
-                  ...UFS.filter((uf) => uf !== 'Todas').map((uf) => ({ value: uf, label: uf })),
-                ]}
-                placeholder="Todos os Estados"
-                triggerClassName="min-w-[150px]"
-              />
-
-              <CustomSelect
+                onChange={(e) => setActiveUf(e.target.value)}
+                className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
+              >
+                {UFS.map((uf) => (
+                  <option key={uf} value={uf} className="bg-[#0f1629]">{uf === 'Todas' ? 'Todos os Estados' : uf}</option>
+                ))}
+              </select>
+              <select
                 value={activeModalidade}
-                onChange={setActiveModalidade}
-                options={[
-                  { value: '', label: 'Todas Modalidades' },
-                  ...modalidades.map((mod) => ({ value: mod, label: mod })),
-                ]}
-                placeholder="Todas Modalidades"
-                triggerClassName="min-w-[180px]"
-              />
-
-              <CustomSelect
+                onChange={(e) => setActiveModalidade(e.target.value)}
+                className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
+              >
+                <option value="" className="bg-[#0f1629]">Todas Modalidades</option>
+                {modalidades.map((mod) => (
+                  <option key={mod} value={mod} className="bg-[#0f1629]">{mod}</option>
+                ))}
+              </select>
+              <select
                 value={activeStatus}
-                onChange={setActiveStatus}
-                options={STATUS_OPTIONS.map((status) => ({ value: status, label: status === 'Todos' ? 'Todos Status' : status }))}
-                placeholder="Todos Status"
-                triggerClassName="min-w-[140px]"
-              />
-
+                onChange={(e) => setActiveStatus(e.target.value)}
+                className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
+              >
+                {STATUS_OPTIONS.map((status) => (
+                  <option key={status} value={status} className="bg-[#0f1629]">{status === 'Todos' ? 'Todos Status' : status}</option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
@@ -282,14 +317,14 @@ export default function App() {
                           type="date"
                           value={dataInicial}
                           onChange={(e) => setDataInicial(e.target.value)}
-                          className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 transition-all"
+                          className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
                         />
                         <span className="text-gray-500">até</span>
                         <input
                           type="date"
                           value={dataFinal}
                           onChange={(e) => setDataFinal(e.target.value)}
-                          className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 transition-all"
+                          className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
                         />
                       </div>
                     </div>
@@ -300,7 +335,7 @@ export default function App() {
                         value={processNumber}
                         onChange={(e) => setProcessNumber(e.target.value)}
                         placeholder="Ex: 001/2024"
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 transition-all"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
                       />
                     </div>
                     <div className="flex items-end gap-2">
@@ -311,7 +346,6 @@ export default function App() {
                         type="button"
                         onClick={resetFilters}
                         className="p-2 rounded-lg border border-white/10 bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-                        aria-label="Limpar filtros"
                       >
                         <RotateCcw size={18} />
                       </button>
@@ -331,60 +365,35 @@ export default function App() {
               <div className="rounded-2xl p-5 border border-white/10 bg-white/5 backdrop-blur-xl">
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="text-lg font-semibold text-white">Filtros</h3>
-                  <button
-                    type="button"
-                    onClick={resetFilters}
-                    className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all"
-                    aria-label="Limpar filtros"
-                  >
+                  <button onClick={resetFilters} className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all">
                     <RotateCcw size={16} />
                   </button>
                 </div>
 
                 <div className="mb-5">
                   <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 block">Estado</label>
-                  <CustomSelect
+                  <select
                     value={activeUf}
-                    onChange={setActiveUf}
-                    options={[
-                      { value: 'Todas', label: 'Todos os Estados' },
-                      ...UFS.filter((uf) => uf !== 'Todas').map((uf) => ({ value: uf, label: uf })),
-                    ]}
-                    placeholder="Todos os Estados"
-                    triggerClassName="w-full"
-                  />
-                </div>
-
-                <div className="mb-5">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 block">Data</label>
-                  <div className="space-y-2">
-                    <input
-                      type="date"
-                      value={dataInicial}
-                      onChange={(e) => setDataInicial(e.target.value)}
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 transition-all"
-                    />
-                    <input
-                      type="date"
-                      value={dataFinal}
-                      onChange={(e) => setDataFinal(e.target.value)}
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 transition-all"
-                    />
-                  </div>
+                    onChange={(e) => setActiveUf(e.target.value)}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
+                  >
+                    {UFS.map((uf) => (
+                      <option key={uf} value={uf} className="bg-[#0f1629]">{uf === 'Todas' ? 'Todos os Estados' : uf}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="mb-5">
                   <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 block">Categoria</label>
-                  <CustomSelect
+                  <select
                     value={filterCategoria}
-                    onChange={setFilterCategoria}
-                    options={[
-                      { value: 'Todas as Categorias', label: 'Todas as Categorias' },
-                      ...CATEGORIAS.map((cat) => ({ value: cat, label: cat })),
-                    ]}
-                    placeholder="Todas as Categorias"
-                    triggerClassName="w-full"
-                  />
+                    onChange={(e) => setFilterCategoria(e.target.value)}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
+                  >
+                    {CATEGORIAS.map((cat) => (
+                      <option key={cat} value={cat} className="bg-[#0f1629]">{cat}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="mb-5">
@@ -485,8 +494,21 @@ export default function App() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3, delay: index * 0.05 }}
+                        className="rounded-2xl p-5 border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
+                        onClick={() => setSelectedBidding(bidding)}
                       >
-                        <BiddingCard bidding={bidding} onSelect={setSelectedBidding} />
+                        <div className="flex items-center justify-between mb-3">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(bidding.status)}`}>
+                            {bidding.status}
+                          </span>
+                          <span className="text-xs text-gray-500">{bidding.portal}</span>
+                        </div>
+                        <h3 className="text-white font-semibold text-sm mb-2 line-clamp-2">{bidding.title}</h3>
+                        <p className="text-gray-400 text-xs mb-3 line-clamp-2">{bidding.description}</p>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500">{bidding.location}</span>
+                          <span className="text-cyan-400 font-medium">{formatCurrency(bidding.value)}</span>
+                        </div>
                       </motion.div>
                     ) : null
                   ))}
@@ -508,22 +530,6 @@ export default function App() {
             <div className="lg:sticky lg:top-6 space-y-4">
               <div className="rounded-2xl p-5 border border-white/10 bg-white/5 backdrop-blur-xl">
                 <h3 className="text-sm font-semibold text-gray-400 mb-4">Análises</h3>
-
-                <div className="mb-4">
-                  <CustomSelect
-                    value="todos"
-                    onChange={() => {}}
-                    options={[
-                      { value: 'todos', label: 'Todos os Órgãos' },
-                      { value: 'recife', label: 'Prefeitura do Recife' },
-                      { value: 'federal', label: 'Governo Federal' },
-                      { value: 'sp', label: 'Estado de São Paulo' },
-                    ]}
-                    placeholder="Todos os Órgãos"
-                    triggerClassName="w-full"
-                  />
-                </div>
-
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs text-gray-400">Modalidade</span>
@@ -533,26 +539,13 @@ export default function App() {
                     <div className="h-full bg-gradient-to-r from-cyan-400 to-blue-600 rounded-full" style={{ width: '68%' }} />
                   </div>
                 </div>
-
                 <div className="flex flex-wrap gap-2 mb-4">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border border-cyan-400/30 bg-cyan-400/10 text-cyan-400">Novidade</span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border border-white/10 bg-white/5 text-gray-400">R$ Reais</span>
                 </div>
-
                 <button className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
                   <span>Ver mais</span>
                   <ArrowUpRight size={12} />
                 </button>
-              </div>
-
-              <div className="rounded-2xl p-5 border border-white/10 bg-white/5 backdrop-blur-xl">
-                <h3 className="text-sm font-semibold text-gray-400 mb-4">Atualizações</h3>
-                <div className="space-y-4">
-                  <TimelineItem title="Construção de Escola Municipal..." time="11 horas atrás" active />
-                  <TimelineItem title="Aquisição de Equipamentos..." time="28 horas atrás" />
-                  <TimelineItem title="Prestação de Serviços de TI..." time="2 dias atrás" />
-                  <TimelineItem title="Reforma do Prédio Público..." time="3 dias atrás" />
-                </div>
               </div>
 
               <div className="bg-gradient-to-br from-cyan-400/10 to-blue-600/10 rounded-2xl p-5 border border-cyan-400/20">
@@ -571,7 +564,75 @@ export default function App() {
         </div>
       </main>
 
-      <BiddingModal bidding={selectedBidding} onClose={() => setSelectedBidding(null)} />
+      <AnimatePresence>
+        {selectedBidding && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedBidding(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#0f1629] rounded-2xl border border-white/10 p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(selectedBidding.status)}`}>
+                  {selectedBidding.status}
+                </span>
+                <button onClick={() => setSelectedBidding(null)} className="text-gray-400 hover:text-white">
+                  <X size={20} />
+                </button>
+              </div>
+              <h2 className="text-xl font-bold text-white mb-4">{selectedBidding.title}</h2>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <span className="text-gray-400">Valor:</span>
+                  <span className="text-white ml-2 font-semibold">{formatCurrency(selectedBidding.value)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Localização:</span>
+                  <span className="text-white ml-2">{selectedBidding.location}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Modalidade:</span>
+                  <span className="text-white ml-2">{selectedBidding.modalidade || selectedBidding.category}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Data de Abertura:</span>
+                  <span className="text-white ml-2">{selectedBidding.openingDate || selectedBidding.dataAberturaProposta}</span>
+                </div>
+                {selectedBidding.nomeOrgao && (
+                  <div>
+                    <span className="text-gray-400">Órgão:</span>
+                    <span className="text-white ml-2">{selectedBidding.nomeOrgao}</span>
+                  </div>
+                )}
+                {selectedBidding.cnpjOrgao && (
+                  <div>
+                    <span className="text-gray-400">CNPJ:</span>
+                    <span className="text-white ml-2">{selectedBidding.cnpjOrgao}</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-gray-300 mt-4 text-sm">{selectedBidding.description}</p>
+              <a
+                href={selectedBidding.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300"
+              >
+                Ver no portal original
+                <ArrowUpRight size={14} />
+              </a>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -593,7 +654,6 @@ function PaginationControls({
         onClick={onPrevious}
         className="p-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-gray-400 hover:text-white disabled:opacity-30"
         disabled={currentPage === 1}
-        aria-label="Página anterior"
       >
         <ChevronLeft size={18} />
       </button>
@@ -604,46 +664,9 @@ function PaginationControls({
         onClick={onNext}
         className="p-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-gray-400 hover:text-white disabled:opacity-30"
         disabled={currentPage === totalPages}
-        aria-label="Próxima página"
       >
         <ChevronRight size={18} />
       </button>
-    </div>
-  );
-}
-
-function NavItem({ icon: Icon, label, active, badge }: { icon: React.ElementType; label: string; active?: boolean; badge?: number }) {
-  return (
-    <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${active ? 'bg-cyan-400/20 text-cyan-400' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
-      <Icon size={18} />
-      <span>{label}</span>
-      {badge && (
-        <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-semibold">{badge}</span>
-      )}
-    </button>
-  );
-}
-
-function MobileNavItem({ icon: Icon, label, active, badge }: { icon: React.ElementType; label: string; active?: boolean; badge?: number }) {
-  return (
-    <button className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-all ${active ? 'bg-cyan-400/20 text-cyan-400' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
-      <Icon size={20} />
-      <span>{label}</span>
-      {badge && (
-        <span className="ml-auto px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-semibold">{badge}</span>
-      )}
-    </button>
-  );
-}
-
-function TimelineItem({ title, time, active }: { title: string; time: string; active?: boolean }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${active ? 'bg-cyan-400' : 'bg-white/20'}`} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-white truncate">{title}</p>
-        <p className="text-xs text-gray-500 mt-0.5">{time}</p>
-      </div>
     </div>
   );
 }

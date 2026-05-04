@@ -11,7 +11,6 @@ export interface Bidding {
   openingDate: string;
   category: string;
   status: BiddingStatus;
-  // Campos PNCP
   cnpjOrgao?: string;
   nomeOrgao?: string;
   modalidade?: string;

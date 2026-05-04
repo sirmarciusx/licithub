@@ -1,40 +1,6 @@
 import { Bidding, BiddingService, SearchFilters, PncpContratacao, PncpPaginatedResponse, PaginatedResponse } from '../types/bidding';
 import { MOCK_BIDDINGS } from '../data/biddingData';
 
-function filterMockBiddings(items: Bidding[], filters?: SearchFilters): Bidding[] {
-  return items.filter((item) => {
-    if (filters?.query) {
-      const searchTerm = normalize(filters.query);
-      const searchableText = normalize(`${item.title} ${item.description} ${item.category}`);
-      if (!searchableText.includes(searchTerm)) return false;
-    }
-
-    if (filters?.uf && filters.uf !== 'Todas') {
-      if (!item.location?.includes(filters.uf)) return false;
-    }
-
-    if (filters?.modalidade) {
-      const modalityNames = ['Leilão Eletrônico', 'Diálogo Competitivo', 'Concurso', 'Concorrência Eletrônica', 'Concorrência Presencial', 'Pregão Eletrônico', 'Pregão Presencial', 'Dispensa de Licitação', 'Inexigibilidade'];
-      const modality = modalityNames[filters.modalidade - 1];
-      if (modality && item.modalidade !== modality) return false;
-    }
-
-    if (filters?.category && filters.category !== 'Todas as Categorias') {
-      if (!normalize(item.category || '').includes(normalize(filters.category))) return false;
-    }
-
-    if (filters?.status && filters.status !== 'Todos') {
-      if (item.status !== filters.status) return false;
-    }
-
-    const value = item.value || item.valorEstimado || item.valorHomologado || 0;
-    if (typeof filters?.valorMin === 'number' && value < filters.valorMin) return false;
-    if (typeof filters?.valorMax === 'number' && value > filters.valorMax) return false;
-
-    return true;
-  });
-}
-
 const MODALITY_CODES: Record<string, number> = {
   'Leilão Eletrônico': 1,
   'Diálogo Competitivo': 2,
@@ -90,39 +56,30 @@ function normalize(value: string | undefined): string {
     .toLowerCase();
 }
 
-function hasLocalFilters(filters?: SearchFilters): boolean {
-  return Boolean(filters?.query || filters?.category || filters?.status || filters?.valorMin || filters?.valorMax);
-}
-
-function applyLocalFilters(items: Bidding[], filters?: SearchFilters): Bidding[] {
-  if (!filters) return items;
-
+function filterMockBiddings(items: Bidding[], filters?: SearchFilters): Bidding[] {
   return items.filter((item) => {
-    const value = item.valorEstimado || item.valorHomologado || item.value || 0;
-
-    if (filters.query) {
+    if (filters?.query) {
       const searchTerm = normalize(filters.query);
-      const searchableText = normalize(`${item.title} ${item.description} ${item.category} ${item.modalidade}`);
+      const searchableText = normalize(`${item.title} ${item.description} ${item.category}`);
       if (!searchableText.includes(searchTerm)) return false;
     }
-
-    if (filters.category && filters.category !== 'Todas as Categorias') {
-      const haystack = normalize(`${item.category} ${item.modalidade} ${item.description}`);
-      if (!haystack.includes(normalize(filters.category))) return false;
+    if (filters?.uf && filters.uf !== 'Todas') {
+      if (!item.location?.includes(filters.uf)) return false;
     }
-
-    if (filters.status && filters.status !== 'Todos' && item.status !== filters.status) {
-      return false;
+    if (filters?.modalidade) {
+      const modalityNames = ['Leilão Eletrônico', 'Diálogo Competitivo', 'Concurso', 'Concorrência Eletrônica', 'Concorrência Presencial', 'Pregão Eletrônico', 'Pregão Presencial', 'Dispensa de Licitação', 'Inexigibilidade'];
+      const modality = modalityNames[filters.modalidade - 1];
+      if (modality && item.modalidade !== modality) return false;
     }
-
-    if (typeof filters.valorMin === 'number' && value < filters.valorMin) {
-      return false;
+    if (filters?.category && filters.category !== 'Todas as Categorias') {
+      if (!normalize(item.category || '').includes(normalize(filters.category))) return false;
     }
-
-    if (typeof filters.valorMax === 'number' && value > filters.valorMax) {
-      return false;
+    if (filters?.status && filters.status !== 'Todos') {
+      if (item.status !== filters.status) return false;
     }
-
+    const value = item.value || item.valorEstimado || item.valorHomologado || 0;
+    if (typeof filters?.valorMin === 'number' && value < filters.valorMin) return false;
+    if (typeof filters?.valorMax === 'number' && value > filters.valorMax) return false;
     return true;
   });
 }
@@ -156,6 +113,36 @@ function mapPncpToBidding(item: PncpContratacao): Bidding {
   };
 }
 
+function hasLocalFilters(filters?: SearchFilters): boolean {
+  return Boolean(filters?.query || filters?.category || filters?.status || filters?.valorMin || filters?.valorMax);
+}
+
+function applyLocalFilters(items: Bidding[], filters?: SearchFilters): Bidding[] {
+  if (!filters) return items;
+  return items.filter((item) => {
+    const value = item.valorEstimado || item.valorHomologado || item.value || 0;
+    if (filters.query) {
+      const searchTerm = normalize(filters.query);
+      const searchableText = normalize(`${item.title} ${item.description} ${item.category} ${item.modalidade}`);
+      if (!searchableText.includes(searchTerm)) return false;
+    }
+    if (filters.category && filters.category !== 'Todas as Categorias') {
+      const haystack = normalize(`${item.category} ${item.modalidade} ${item.description}`);
+      if (!haystack.includes(normalize(filters.category))) return false;
+    }
+    if (filters.status && filters.status !== 'Todos' && item.status !== filters.status) {
+      return false;
+    }
+    if (typeof filters.valorMin === 'number' && value < filters.valorMin) {
+      return false;
+    }
+    if (typeof filters.valorMax === 'number' && value > filters.valorMax) {
+      return false;
+    }
+    return true;
+  });
+}
+
 export class PncpBiddingService implements BiddingService {
   private baseUrl: string;
 
@@ -167,7 +154,6 @@ export class PncpBiddingService implements BiddingService {
     if (typeof date === 'string') {
       return date.replaceAll('-', '');
     }
-
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -179,7 +165,6 @@ export class PncpBiddingService implements BiddingService {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - defaultDays);
-
     return {
       startDate: filters?.dataInicial ? this.formatDateForApi(filters.dataInicial) : this.formatDateForApi(startDate),
       endDate: filters?.dataFinal ? this.formatDateForApi(filters.dataFinal) : this.formatDateForApi(endDate),
@@ -195,14 +180,12 @@ export class PncpBiddingService implements BiddingService {
         'Content-Type': 'application/json',
       },
     });
-
     if (!response.ok) {
       if (response.status >= 500) {
         throw new Error('PNCP_API_UNAVAILABLE');
       }
       throw new Error(`PNCP API error: ${response.status}`);
     }
-
     return response.json() as Promise<T>;
   }
 
@@ -217,7 +200,6 @@ export class PncpBiddingService implements BiddingService {
     if (filters?.modalidade) {
       params.append('codigoModalidadeContratacao', String(filters.modalidade));
     }
-
     if (filters?.uf) {
       params.append('uf', filters.uf);
     }
@@ -234,7 +216,6 @@ export class PncpBiddingService implements BiddingService {
 
     try {
       const response = await this.fetchFromPncp<PncpPaginatedResponse<PncpContratacao>>(endpoint);
-
       if (!response.data || response.data.length === 0) {
         const mockFiltered = filterMockBiddings(MOCK_BIDDINGS, filters);
         return {
@@ -244,11 +225,9 @@ export class PncpBiddingService implements BiddingService {
           pagina: 1,
         };
       }
-
       const mappedItems = response.data.map(mapPncpToBidding);
       const filteredItems = applyLocalFilters(mappedItems, filters);
       const localFiltersApplied = hasLocalFilters(filters);
-
       return {
         items: filteredItems,
         totalRegistros: localFiltersApplied ? filteredItems.length : response.totalRegistros,
@@ -272,10 +251,8 @@ export class PncpBiddingService implements BiddingService {
     if (parts.length !== 3) {
       return null;
     }
-
     const [cnpj, ano, sequencial] = parts;
     const endpoint = `/v1/orgaos/${cnpj}/compras/${ano}/${sequencial}`;
-
     try {
       const response = await this.fetchFromPncp<PncpContratacao>(endpoint);
       return mapPncpToBidding(response);
@@ -293,31 +270,6 @@ export class PncpBiddingService implements BiddingService {
 
   async getModalidades(): Promise<string[]> {
     return MODALITY_NAMES;
-  }
-
-  async getByPropostaAberta(filters?: SearchFilters): Promise<Bidding[]> {
-    const { endDate } = this.getDefaultDateRange(filters);
-    const params = new URLSearchParams();
-    params.append('dataFinal', endDate);
-    params.append('pagina', String(filters?.pagina || 1));
-    params.append('tamanhoPagina', String(filters?.tamanhoPagina || 50));
-
-    if (filters?.modalidade) {
-      params.append('codigoModalidadeContratacao', String(filters.modalidade));
-    }
-
-    if (filters?.uf) {
-      params.append('uf', filters.uf);
-    }
-
-    const endpoint = `/v1/contratacoes/proposta?${params.toString()}`;
-    const response = await this.fetchFromPncp<PncpPaginatedResponse<PncpContratacao>>(endpoint);
-
-    if (!response.data || response.data.length === 0) {
-      return [];
-    }
-
-    return applyLocalFilters(response.data.map(mapPncpToBidding), filters);
   }
 }
 
