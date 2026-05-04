@@ -228,12 +228,14 @@ export class PncpBiddingService implements BiddingService {
       const mappedItems = response.data.map(mapPncpToBidding);
       const filteredItems = applyLocalFilters(mappedItems, filters);
       const localFiltersApplied = hasLocalFilters(filters);
-      return {
+      const result = {
         items: filteredItems,
-        totalRegistros: localFiltersApplied ? filteredItems.length : response.totalRegistros,
-        totalPaginas: localFiltersApplied ? Math.max(1, Math.ceil(filteredItems.length / (filters?.tamanhoPagina || 50))) : response.totalPaginas,
-        pagina: response.numeroPagina,
+        totalRegistros: localFiltersApplied ? filteredItems.length : (response.totalRegistros || filteredItems.length),
+        totalPaginas: localFiltersApplied ? Math.max(1, Math.ceil(filteredItems.length / (filters?.tamanhoPagina || 50))) : (response.totalPaginas || 1),
+        pagina: response.numeroPagina || 1,
       };
+      console.log('[PNCP API] Result:', JSON.stringify(result).slice(0, 200));
+      return result;
     } catch (error) {
       console.warn('[PNCP API] Falha, usando dados mock:', error instanceof Error ? error.message : 'Unknown error');
       const mockFiltered = filterMockBiddings(MOCK_BIDDINGS, filters);
